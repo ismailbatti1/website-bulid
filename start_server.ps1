@@ -22,6 +22,24 @@ try {
         $response = $context.Response
 
         $urlPath = $request.Url.LocalPath.TrimStart('/')
+
+        if ($urlPath -eq "api/inquiry") {
+            $reader = New-Object System.IO.StreamReader($request.InputStream, $request.ContentEncoding)
+            $body = $reader.ReadToEnd()
+            $reader.Close()
+            Write-Host "[LOCAL API INQUIRY RECEIVED]" -ForegroundColor Yellow
+            Write-Host $body -ForegroundColor Cyan
+
+            $jsonResp = '{"success":true,"message":"Thank you for your inquiry. We have received your request and will contact you soon."}'
+            $bytes = [System.Text.Encoding]::UTF8.GetBytes($jsonResp)
+            $response.ContentType = "application/json; charset=utf-8"
+            $response.StatusCode = 200
+            $response.ContentLength64 = $bytes.Length
+            $response.OutputStream.Write($bytes, 0, $bytes.Length)
+            $response.Close()
+            continue
+        }
+
         if ([string]::IsNullOrWhiteSpace($urlPath)) {
             $urlPath = "index.html"
         }
