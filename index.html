@@ -791,10 +791,16 @@
 </div>
 <!-- Submit Button & Feedback Messages -->
 <div class="pt-space-xs space-y-3">
-<button class="w-full bg-secondary hover:bg-secondary-fixed text-on-secondary-fixed font-label-caps text-label-caps uppercase py-space-md tracking-widest transition-all font-bold shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed" id="submitBtn" type="submit">
-  <span id="submitBtnText">Submit Manufacturing Inquiry</span>
-  <span class="material-symbols-outlined text-[18px]" id="submitBtnIcon">send</span>
-</button>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+  <button class="w-full bg-secondary hover:bg-secondary-fixed text-on-secondary-fixed font-label-caps text-label-caps uppercase py-space-md tracking-widest transition-all font-bold shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed" id="submitBtn" type="submit">
+    <span id="submitBtnText">Submit Manufacturing Inquiry</span>
+    <span class="material-symbols-outlined text-[18px]" id="submitBtnIcon">send</span>
+  </button>
+  <button type="button" onclick="sendViaWhatsAppDirect()" class="w-full bg-[#25D366] hover:bg-[#20ba59] text-black font-label-caps text-label-caps uppercase py-space-md tracking-widest transition-all font-bold shadow-md flex items-center justify-center gap-2 cursor-pointer" id="waDirectSubmitBtn">
+    <span class="material-symbols-outlined text-[18px]">chat</span>
+    <span>Direct WhatsApp Submit</span>
+  </button>
+</div>
 
 <!-- Success Feedback Box -->
 <div class="hidden bg-surface-container-lowest border-l-4 border-emerald-500 p-space-md text-on-surface transition-all" id="formSuccess">
@@ -806,12 +812,19 @@
     Thank you for your inquiry. We have received your request and will contact you soon.
   </p>
   <p class="font-body-sm text-xs text-on-surface-variant mt-1">
-    Our export production desk has received your specifications. We will review your requirements and respond within 24 hours.
+    Our export production desk has received your specifications. Your query has been logged for <strong class="text-on-surface">ismailbatti1234@gmail.com</strong> and pre-formatted for WhatsApp <strong class="text-on-surface">+92 315 4533297</strong>.
   </p>
-  <button type="button" onclick="resetInquiryForm()" class="mt-3 inline-flex items-center gap-1.5 text-xs uppercase font-label-caps text-secondary hover:text-secondary-fixed font-semibold tracking-wider">
-    <span class="material-symbols-outlined text-[14px]">refresh</span>
-    <span>Submit Another Inquiry</span>
-  </button>
+  
+  <div class="mt-4 pt-3 border-t border-outline-variant/30 flex flex-wrap items-center gap-3">
+    <a id="waDirectBtn" href="https://wa.me/923154533297" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 bg-[#25D366] hover:bg-[#20ba59] text-black font-label-caps text-label-caps uppercase px-4 py-2 font-bold tracking-wider rounded transition-colors shadow">
+      <span class="material-symbols-outlined text-[18px]">chat</span>
+      <span>Confirm on WhatsApp (+92 315 4533297)</span>
+    </a>
+    <button type="button" onclick="resetInquiryForm()" class="inline-flex items-center gap-1.5 text-xs uppercase font-label-caps text-secondary hover:text-secondary-fixed font-semibold tracking-wider px-3 py-2 bg-surface-container-high border border-outline-variant/40">
+      <span class="material-symbols-outlined text-[14px]">refresh</span>
+      <span>Submit Another Inquiry</span>
+    </button>
+  </div>
 </div>
 
 <!-- Error Feedback Box -->
@@ -824,9 +837,9 @@
     Unable to submit inquiry at this moment. Please check your connection and try again.
   </p>
   <div class="mt-3 flex items-center gap-3">
-    <a href="https://wa.me/923154533297" target="_blank" class="inline-flex items-center gap-1 bg-secondary text-on-secondary-fixed px-3 py-1.5 text-xs font-bold uppercase tracking-wider font-label-caps">
+    <a id="waErrorBtn" href="https://wa.me/923154533297" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 bg-[#25D366] text-black px-3 py-1.5 text-xs font-bold uppercase tracking-wider font-label-caps rounded">
       <span class="material-symbols-outlined text-[14px]">chat</span>
-      <span>Direct WhatsApp Desk</span>
+      <span>Send Direct via WhatsApp (+92 315 4533297)</span>
     </a>
   </div>
 </div>
@@ -838,6 +851,73 @@
 </section>
 <!-- SCRIPT FOR DYNAMIC INTERACTIONS -->
 <script>
+    function getInquiryData() {
+      const fullName = (document.getElementById('fullName')?.value || '').trim();
+      const companyName = (document.getElementById('companyName')?.value || '').trim();
+      const emailAddress = (document.getElementById('emailAddress')?.value || '').trim();
+      const phoneWhatsApp = (document.getElementById('phoneWhatsApp')?.value || '').trim();
+      const country = (document.getElementById('country')?.value || '').trim();
+      const targetCategory = document.getElementById('targetCategory')?.value || '';
+      const estimatedQuantity = document.getElementById('estimatedQuantity')?.value || '';
+      const projectScope = (document.getElementById('projectScope')?.value || '').trim();
+
+      const checkedSpecs = Array.from(document.querySelectorAll('#rfq-form input[type="checkbox"]:checked'))
+        .map(cb => {
+          const labelSpan = cb.parentElement.querySelector('span');
+          return labelSpan ? labelSpan.innerText.trim() : cb.value;
+        });
+
+      return {
+        fullName,
+        companyName,
+        emailAddress,
+        phoneWhatsApp,
+        country,
+        targetCategory,
+        estimatedQuantity,
+        specifications: checkedSpecs,
+        projectScope
+      };
+    }
+
+    function buildWhatsAppUrl(data) {
+      const waText = `*New Client Inquiry - Noor Layers MFG*\n` +
+        `━━━━━━━━━━━━━━━━━━━\n` +
+        `👤 *Client Name:* ${data.fullName}\n` +
+        `🏢 *Company:* ${data.companyName}\n` +
+        `✉️ *Email:* ${data.emailAddress}\n` +
+        `📱 *Phone / WhatsApp:* ${data.phoneWhatsApp}\n` +
+        `🌍 *Destination Country:* ${data.country}\n` +
+        `📦 *Product:* ${data.targetCategory}\n` +
+        `🔢 *Quantity:* ${data.estimatedQuantity}\n` +
+        `📋 *Specs:* ${data.specifications && data.specifications.length > 0 ? data.specifications.join(', ') : 'Standard Specs'}\n` +
+        `━━━━━━━━━━━━━━━━━━━\n` +
+        `📝 *Custom Requirements / Message:*\n${data.projectScope}`;
+
+      return `https://wa.me/923154533297?text=${encodeURIComponent(waText)}`;
+    }
+
+    function validateInquiry(data) {
+      const errorBox = document.getElementById('formError');
+      const errorMsg = document.getElementById('formErrorMessage');
+
+      if (!data.fullName || !data.companyName || !data.emailAddress || !data.phoneWhatsApp || !data.country || !data.targetCategory || !data.estimatedQuantity || !data.projectScope) {
+        errorMsg.innerText = "Please fill in all mandatory fields (marked with *) before transmitting your inquiry.";
+        errorBox.classList.remove('hidden');
+        return false;
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(data.emailAddress)) {
+        errorMsg.innerText = "Please enter a valid business email address (e.g. name@company.com).";
+        errorBox.classList.remove('hidden');
+        document.getElementById('emailAddress').focus();
+        return false;
+      }
+
+      return true;
+    }
+
     async function handleFormSubmit(event) {
       if (event) event.preventDefault();
       
@@ -852,50 +932,14 @@
       successBox.classList.add('hidden');
       errorBox.classList.add('hidden');
       
-      // Field extraction
-      const fullName = (document.getElementById('fullName')?.value || '').trim();
-      const companyName = (document.getElementById('companyName')?.value || '').trim();
-      const emailAddress = (document.getElementById('emailAddress')?.value || '').trim();
-      const phoneWhatsApp = (document.getElementById('phoneWhatsApp')?.value || '').trim();
-      const country = (document.getElementById('country')?.value || '').trim();
-      const targetCategory = document.getElementById('targetCategory')?.value || '';
-      const estimatedQuantity = document.getElementById('estimatedQuantity')?.value || '';
-      const projectScope = (document.getElementById('projectScope')?.value || '').trim();
-      
-      // Validation: Required fields
-      if (!fullName || !companyName || !emailAddress || !phoneWhatsApp || !country || !targetCategory || !estimatedQuantity || !projectScope) {
-        errorMsg.innerText = "Please fill in all mandatory fields (marked with *) before transmitting your inquiry.";
-        errorBox.classList.remove('hidden');
-        return;
-      }
-      
-      // Validation: Email format regex
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(emailAddress)) {
-        errorMsg.innerText = "Please enter a valid business email address (e.g. name@company.com).";
-        errorBox.classList.remove('hidden');
-        document.getElementById('emailAddress').focus();
-        return;
-      }
-      
-      // Gather checked specifications
-      const checkedSpecs = Array.from(document.querySelectorAll('#rfq-form input[type="checkbox"]:checked'))
-        .map(cb => {
-          const labelSpan = cb.parentElement.querySelector('span');
-          return labelSpan ? labelSpan.innerText.trim() : cb.value;
-        });
+      const data = getInquiryData();
+      if (!validateInquiry(data)) return;
 
-      const payload = {
-        fullName,
-        companyName,
-        emailAddress,
-        phoneWhatsApp,
-        country,
-        targetCategory,
-        estimatedQuantity,
-        specifications: checkedSpecs,
-        projectScope
-      };
+      const waUrl = buildWhatsAppUrl(data);
+      const waDirectBtn = document.getElementById('waDirectBtn');
+      if (waDirectBtn) waDirectBtn.href = waUrl;
+      const waErrorBtn = document.getElementById('waErrorBtn');
+      if (waErrorBtn) waErrorBtn.href = waUrl;
       
       // Set Loading State (prevent duplicate submissions)
       submitBtn.disabled = true;
@@ -910,25 +954,32 @@
             'Content-Type': 'application/json',
             'Accept': 'application/json'
           },
-          body: JSON.stringify(payload)
+          body: JSON.stringify(data)
         });
         
-        const data = await response.json().catch(() => ({}));
+        const resData = await response.json().catch(() => ({}));
         
-        if (response.ok && data.success !== false) {
+        if (response.ok && resData.success !== false) {
           // Success State
           successBox.classList.remove('hidden');
           document.getElementById('rfq-form').reset();
           successBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+          // Also launch WhatsApp directly in new window
+          try {
+            window.open(waUrl, '_blank');
+          } catch (e) {
+            console.log('Browser blocked popup; client can use WhatsApp button.');
+          }
         } else {
           // Error State from API
-          errorMsg.innerText = data.message || "An unexpected error occurred while transmitting your inquiry. Please try again or reach out directly to WhatsApp (+92 315 4533297).";
+          errorMsg.innerText = resData.message || "An unexpected error occurred while transmitting your inquiry. Please try again or reach out directly to WhatsApp (+92 315 4533297).";
           errorBox.classList.remove('hidden');
           errorBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
       } catch (err) {
         console.error('Submission network error:', err);
-        errorMsg.innerText = "Unable to connect to the quotation desk. Please check your internet connection or contact us directly via WhatsApp (+92 315 4533297).";
+        errorMsg.innerText = "Unable to connect to the quotation desk. Please click below to send your inquiry directly via WhatsApp (+92 315 4533297).";
         errorBox.classList.remove('hidden');
       } finally {
         // Reset button state
@@ -937,6 +988,38 @@
         submitBtnText.innerText = "Submit Manufacturing Inquiry";
         submitBtnIcon.innerText = "send";
       }
+    }
+
+    async function sendViaWhatsAppDirect() {
+      const successBox = document.getElementById('formSuccess');
+      const errorBox = document.getElementById('formError');
+      successBox.classList.add('hidden');
+      errorBox.classList.add('hidden');
+
+      const data = getInquiryData();
+      if (!validateInquiry(data)) return;
+
+      const waUrl = buildWhatsAppUrl(data);
+      const waDirectBtn = document.getElementById('waDirectBtn');
+      if (waDirectBtn) waDirectBtn.href = waUrl;
+
+      // Dispatch to API in background so email is also received
+      fetch('/api/inquiry', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(data)
+      }).catch(err => console.log('Background email dispatch:', err));
+
+      // Open WhatsApp immediately (direct user gesture, not blocked by popup blocker)
+      window.open(waUrl, '_blank');
+
+      // Show success feedback
+      successBox.classList.remove('hidden');
+      document.getElementById('rfq-form').reset();
+      successBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
     
     function resetInquiryForm() {
