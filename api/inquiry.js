@@ -79,7 +79,7 @@ export default async function handler(req, res) {
       ? specifications.map(s => String(s).trim()).join(', ')
       : 'None selected';
 
-    const recipientEmail = 'ismailbatti1234@gmail.com';
+    const recipientEmail = 'ismailbhatti78612@gmail.com';
     const emailSubject = 'New Client Inquiry - Noor Layers MFG';
 
     // Plain text email format as requested
