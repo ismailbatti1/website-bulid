@@ -19,7 +19,10 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Messages array is required' });
   }
 
-  const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "AQ.Ab8RN6JKnBqOxbFYzBUr3a25qcPs3ZD6XXAG6xOV4sp3g4vEUQ";
+  const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+  if (!GEMINI_API_KEY) {
+    return res.status(500).json({ error: 'GEMINI_API_KEY is not set in Vercel Environment Variables.' });
+  }
 
   const systemInstruction = `BUSINESS INFORMATION
 Business name: Noor Layers MFG
