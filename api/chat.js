@@ -13,12 +13,13 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  const { messages } = req.body;
+  const { messages } = req.body || {};
 
-  const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-  if (!GEMINI_API_KEY) {
-    return res.status(500).json({ error: 'API key is not configured. Please add GEMINI_API_KEY in Vercel.' });
+  if (!messages || !Array.isArray(messages)) {
+    return res.status(400).json({ error: 'Messages array is required' });
   }
+
+  const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "AQ.Ab8RN6JKnBqOxbFYzBUr3a25qcPs3ZD6XXAG6xOV4sp3g4vEUQ";
 
   const systemInstruction = `BUSINESS INFORMATION
 Business name: Noor Layers MFG
@@ -50,8 +51,14 @@ PRODUCT & QUOTATION HANDLING
 • When buying intent is shown, guide toward the order process by collecting missing requirements.
 • Use clear calls to action naturally in conversation like "Request a Quote", "Send Your Design", "Contact Noor Layers MFG".
 
-INQUIRY
-If they want to submit an inquiry or have provided their requirements, tell them our team will process it. You can ask for their Email or WhatsApp contact so the team (ismailbatti1234@gmail.com) can follow up. Alternatively, tell them to use the "Request a Quote" form on the website to submit directly.`;
+INQUIRY & CONTACT
+If they want to submit an inquiry or have provided their requirements, collect their:
+• Name
+• Product & Quantity
+• Email or WhatsApp contact
+The business contact email is: ismailbatti1234@gmail.com
+Phone / WhatsApp: +92 315 4533297
+Tell them our team will prepare their quotation promptly.`;
 
   try {
     const formattedMessages = messages.map(msg => ({
@@ -59,7 +66,7 @@ If they want to submit an inquiry or have provided their requirements, tell them
       parts: [{ text: msg.content }]
     }));
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${GEMINI_API_KEY}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -77,10 +84,10 @@ If they want to submit an inquiry or have provided their requirements, tell them
 
     if (!response.ok) {
       console.error('Gemini API Error:', data);
-      return res.status(500).json({ error: 'AI processing failed' });
+      return res.status(500).json({ error: data?.error?.message || 'AI processing failed' });
     }
 
-    const aiMessage = data.candidates[0].content.parts[0].text;
+    const aiMessage = data?.candidates?.[0]?.content?.parts?.[0]?.text || "Thank you for reaching out. How else can Noor Layers MFG assist you?";
     return res.status(200).json({ message: aiMessage });
   } catch (err) {
     console.error('Chat API Error:', err);
