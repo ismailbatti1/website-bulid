@@ -193,13 +193,16 @@ export default async function handler(req, res) {
           name: safeName,
           company: safeCompany,
           email: safeEmail,
+          _replyto: safeEmail,
           phone: safePhone,
           country: safeCountry,
           product: safeProduct,
           quantity: safeQuantity,
           specifications: specsFormatted,
           requirements: safeRequirements,
-          _subject: emailSubject
+          _subject: emailSubject,
+          _captcha: 'false',
+          _template: 'table'
         })
       });
 
