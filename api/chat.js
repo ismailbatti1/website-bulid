@@ -79,7 +79,6 @@ Tell them our team will prepare their quotation promptly.`;
   // Keep last 10 messages for memory & speed
   if (rawList.length > 10) {
     rawList = rawList.slice(-10);
-    // Again ensure starts with 'user'
     while (rawList.length > 0 && rawList[0].role === 'model') {
       rawList.shift();
     }
@@ -106,18 +105,18 @@ Tell them our team will prepare their quotation promptly.`;
     }
   }
 
-  // Ensure last message is from user
   if (contents.length === 0 || contents[contents.length - 1].role !== 'user') {
     const fallbackText = rawList[rawList.length - 1]?.text || "Hello";
     contents.push({ role: 'user', parts: [{ text: fallbackText }] });
   }
 
-  // Multi-model failover list (order of priority)
+  // Active models supported for new API keys
   const modelsToTry = [
-    'gemini-2.5-flash-lite',
-    'gemini-flash-latest',
+    'gemini-3.8-flash',
+    'gemini-3.7-flash',
+    'gemini-3.6-flash',
     'gemini-3.5-flash',
-    'gemini-3.8-flash'
+    'gemini-flash-latest'
   ];
 
   for (const model of modelsToTry) {
@@ -142,22 +141,24 @@ Tell them our team will prepare their quotation promptly.`;
         return res.status(200).json({ message: aiMessage });
       }
 
-      console.warn(`[Gemini Fallback] Model ${model} returned:`, data?.error?.message || response.status);
+      console.warn(`[Gemini Failover] Model ${model} returned:`, data?.error?.message || response.status);
     } catch (err) {
-      console.warn(`[Gemini Fallback] Network error on ${model}:`, err.message);
+      console.warn(`[Gemini Failover] Network error on ${model}:`, err.message);
     }
   }
 
-  // Intelligent conversational fallback if Google API is temporarily unreachable
+  // Graceful sales response if cloud AI has an intermittent outage
   const latestQuestion = rawList[rawList.length - 1]?.text?.toLowerCase() || '';
-  let fallbackReply = "We can certainly assist you with that! Noor Layers MFG specializes in custom manufacturing for hoodies, jackets, sportswear, and private labeling. Could you please share your required quantity, design specifications, and delivery country so we can guide your quotation?";
+  let fallbackReply = "We can definitely help you with that! Noor Layers MFG manufactures custom jackets, hoodies, sportswear, and private label garments. To guide you with pricing and production, how many pieces do you need and do you have a design or reference image ready?";
 
   if (latestQuestion.includes('price') || latestQuestion.includes('cost') || latestQuestion.includes('how much') || latestQuestion.includes('rate')) {
-    fallbackReply = "Our pricing is customized based on your order quantity, fabric selection, branding requirements (embroidery/printing), and delivery destination. If you share your quantity and design details, our team will provide a tailored quotation!";
+    fallbackReply = "Our pricing is customized based on your required quantity, fabric specifications, custom branding/embroidery, and shipping destination. Please let us know the quantity and specs you need so we can prepare an exact quotation for you!";
   } else if (latestQuestion.includes('ship') || latestQuestion.includes('deliver') || latestQuestion.includes('country') || latestQuestion.includes('uk') || latestQuestion.includes('usa')) {
-    fallbackReply = "Yes, we ship globally including the USA, UK, Europe, Canada, and Australia. Please let us know your required product, quantity, and destination country to provide production and shipping timelines.";
-  } else if (latestQuestion.includes('hoodie') || latestQuestion.includes('jacket') || latestQuestion.includes('shirt')) {
-    fallbackReply = "Yes, we specialize in high-grade custom apparel manufacturing with complete private labeling. Do you already have a design or logo, and how many pieces are you looking to produce?";
+    fallbackReply = "Yes, we ship worldwide to international brands and businesses across the USA, UK, Europe, and beyond. Please share your delivery country and product details so we can guide your order.";
+  } else if (latestQuestion.includes('jacket') || latestQuestion.includes('leather')) {
+    fallbackReply = "Yes, we manufacture premium custom leather jackets and varsity jackets with customized embroidery, lining, and brand logos. What style and quantity are you looking to produce?";
+  } else if (latestQuestion.includes('hoodie') || latestQuestion.includes('sweatshirt')) {
+    fallbackReply = "Yes, we produce custom heavy-weight hoodies, fleece jackets, and streetwear with private labeling. How many pieces do you need, and do you have a logo ready?";
   }
 
   return res.status(200).json({ message: fallbackReply });
