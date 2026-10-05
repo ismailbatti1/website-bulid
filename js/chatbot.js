@@ -16,15 +16,16 @@
       background-color: #e9c176;
       color: #261900;
       border: none;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.4);
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: transform 0.2s;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
     #noor-chatbot-button:hover {
-      transform: scale(1.05);
+      transform: scale(1.08);
+      box-shadow: 0 6px 18px rgba(233,193,118,0.4);
     }
     #noor-chatbot-button .material-symbols-outlined {
       font-size: 32px;
@@ -34,12 +35,13 @@
       position: absolute;
       bottom: 80px;
       right: 0;
-      width: 350px;
-      height: 500px;
+      width: 360px;
+      height: 520px;
+      max-height: 80vh;
       background-color: #101417;
       border: 1px solid #323538;
-      border-radius: 12px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      border-radius: 14px;
+      box-shadow: 0 12px 36px rgba(0,0,0,0.6);
       flex-direction: column;
       overflow: hidden;
     }
@@ -52,15 +54,16 @@
         position: fixed;
         bottom: 0;
         right: 0;
-        width: 100%;
-        height: 100%;
+        width: 100vw;
+        height: 100vh;
+        max-height: 100vh;
         border-radius: 0;
         border: none;
       }
     }
     #noor-chatbot-header {
       background-color: #0b0f11;
-      padding: 16px;
+      padding: 16px 18px;
       border-bottom: 2px solid #e9c176;
       display: flex;
       justify-content: space-between;
@@ -69,18 +72,24 @@
     #noor-chatbot-header h3 {
       margin: 0;
       color: #ffffff;
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 600;
       display: flex;
       align-items: center;
       gap: 8px;
+      letter-spacing: 0.5px;
     }
     #noor-chatbot-header .close-btn {
       background: none;
       border: none;
       color: #8e8e93;
       cursor: pointer;
-      font-size: 20px;
+      font-size: 22px;
+      line-height: 1;
+      padding: 0 4px;
+    }
+    #noor-chatbot-header .close-btn:hover {
+      color: #ffffff;
     }
     #noor-chatbot-messages {
       flex: 1;
@@ -89,12 +98,13 @@
       display: flex;
       flex-direction: column;
       gap: 12px;
+      scroll-behavior: smooth;
     }
     .chat-msg {
       max-width: 85%;
       padding: 10px 14px;
-      border-radius: 8px;
-      font-size: 14px;
+      border-radius: 10px;
+      font-size: 13.5px;
       line-height: 1.5;
       word-wrap: break-word;
     }
@@ -108,11 +118,12 @@
     .chat-msg.user {
       background-color: #e9c176;
       color: #261900;
+      font-weight: 500;
       align-self: flex-end;
       border-bottom-right-radius: 2px;
     }
     #noor-chatbot-input-area {
-      padding: 12px 16px;
+      padding: 12px 14px;
       background-color: #0b0f11;
       border-top: 1px solid #323538;
       display: flex;
@@ -124,8 +135,8 @@
       border: 1px solid #44474b;
       color: #e0e2e6;
       padding: 10px 12px;
-      border-radius: 6px;
-      font-size: 14px;
+      border-radius: 8px;
+      font-size: 13.5px;
       outline: none;
     }
     #noor-chatbot-input:focus {
@@ -135,10 +146,14 @@
       background-color: #e9c176;
       color: #261900;
       border: none;
-      border-radius: 6px;
+      border-radius: 8px;
       padding: 0 16px;
       font-weight: 600;
       cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+    #noor-chatbot-send:hover {
+      background-color: #ffdea5;
     }
     #noor-chatbot-send:disabled {
       opacity: 0.5;
@@ -147,9 +162,9 @@
     .typing-indicator {
       display: flex;
       gap: 4px;
-      padding: 12px 16px;
+      padding: 10px 14px;
       background-color: #191c1f;
-      border-radius: 8px;
+      border-radius: 10px;
       align-self: flex-start;
       width: fit-content;
       border-bottom-left-radius: 2px;
@@ -158,7 +173,7 @@
     .typing-dot {
       width: 6px;
       height: 6px;
-      background-color: #8e8e93;
+      background-color: #e9c176;
       border-radius: 50%;
       animation: typing 1.4s infinite ease-in-out both;
     }
@@ -182,17 +197,17 @@
       </div>
       <div id="noor-chatbot-messages"></div>
       <div id="noor-chatbot-input-area">
-        <input type="text" id="noor-chatbot-input" placeholder="Type your message..." autocomplete="off" />
+        <input type="text" id="noor-chatbot-input" placeholder="Ask about products, MOQ, prices..." autocomplete="off" />
         <button id="noor-chatbot-send">Send</button>
       </div>
     </div>
-    <button id="noor-chatbot-button">
+    <button id="noor-chatbot-button" aria-label="Open Chat">
       <span class="material-symbols-outlined">chat</span>
     </button>
   `;
   document.body.appendChild(container);
 
-  // Logic
+  // State
   const button = document.getElementById('noor-chatbot-button');
   const chatWindow = document.getElementById('noor-chatbot-window');
   const closeBtn = document.getElementById('noor-chatbot-close');
@@ -204,31 +219,28 @@
   let chatHistory = [];
   let isWaiting = false;
 
+  const renderBubble = (role, text) => {
+    const msgDiv = document.createElement('div');
+    msgDiv.className = 'chat-msg ' + role;
+    let formattedText = text.replace(/\\*\\*(.*?)\\*\\*/g, '<strong>$1</strong>');
+    msgDiv.innerHTML = formattedText;
+    messagesContainer.appendChild(msgDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  };
+
   const toggleChat = () => {
     isOpen = !isOpen;
     chatWindow.style.display = isOpen ? 'flex' : 'none';
-    if (isOpen && chatHistory.length === 0) {
-      addMessage('assistant', "Hi! Welcome to Noor Layers MFG. I'm here to help with custom apparel, manufacturing, product questions and quotations. What would you like to know?");
+    if (isOpen && messagesContainer.children.length === 0) {
+      renderBubble('assistant', "Hi! Welcome to Noor Layers MFG. I'm here to help with custom apparel, manufacturing, product questions and quotations. What would you like to know?");
     }
     if (isOpen) {
-      setTimeout(() => input.focus(), 100);
+      setTimeout(() => input.focus(), 150);
     }
   };
 
   button.addEventListener('click', toggleChat);
   closeBtn.addEventListener('click', toggleChat);
-
-  const addMessage = (role, text) => {
-    const msgDiv = document.createElement('div');
-    msgDiv.className = 'chat-msg ' + role;
-    // Basic formatting for bold text from AI (e.g., **text**)
-    let formattedText = text.replace(/\\*\\*(.*?)\\*\\*/g, '<strong>$1</strong>');
-    msgDiv.innerHTML = formattedText;
-    messagesContainer.appendChild(msgDiv);
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    
-    chatHistory.push({ role, content: text });
-  };
 
   const showTyping = () => {
     const typingDiv = document.createElement('div');
@@ -252,7 +264,9 @@
     if (!text) return;
 
     input.value = '';
-    addMessage('user', text);
+    renderBubble('user', text);
+    chatHistory.push({ role: 'user', content: text });
+
     isWaiting = true;
     sendBtn.disabled = true;
     input.disabled = true;
@@ -261,10 +275,8 @@
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ messages: chatHistory.slice(0, -1).concat([{ role: 'user', content: text }]) }) // Ensure latest text is sent
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: chatHistory })
       });
 
       const data = await response.json();
@@ -275,16 +287,17 @@
       input.focus();
 
       if (response.ok && data.message) {
-        addMessage('assistant', data.message);
+        renderBubble('assistant', data.message);
+        chatHistory.push({ role: 'assistant', content: data.message });
       } else {
-        addMessage('assistant', "I'm currently unable to connect to the server (" + (data.error || response.status) + "). Please try again later.");
+        renderBubble('assistant', data.message || "Thank you for contacting Noor Layers MFG. Please feel free to reach out via WhatsApp at +92 315 4533297 or email ismailbatti1234@gmail.com.");
       }
     } catch (err) {
       hideTyping();
       isWaiting = false;
       sendBtn.disabled = false;
       input.disabled = false;
-      addMessage('assistant', "Connection error. Please try again or use our contact form.");
+      renderBubble('assistant', "We specialize in custom manufacturing for hoodies, jackets, and sportswear. You can also connect directly with our export desk on WhatsApp (+92 315 4533297).");
     }
   };
 

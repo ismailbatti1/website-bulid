@@ -15,8 +15,8 @@ export default async function handler(req, res) {
 
   const { messages } = req.body || {};
 
-  if (!messages || !Array.isArray(messages)) {
-    return res.status(400).json({ error: 'Messages array is required' });
+  if (!messages || !Array.isArray(messages) || messages.length === 0) {
+    return res.status(400).json({ error: 'Valid messages array is required' });
   }
 
   const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -37,7 +37,7 @@ Your goal is to help visitors understand the company, answer questions, collect 
 
 BEHAVIOR RULES
 • Behave like a professional human sales representative.
-• Understand natural language and maintain conversation context.
+• Understand natural language and maintain conversation context across follow-up questions.
 • Answer questions clearly, naturally, and concisely without repeating the same information.
 • Ask relevant questions when more information is required (but not all at once).
 • Never make the customer feel like they are talking to a basic automated FAQ.
@@ -63,12 +63,56 @@ The business contact email is: ismailbatti1234@gmail.com
 Phone / WhatsApp: +92 315 4533297
 Tell them our team will prepare their quotation promptly.`;
 
-  const formattedMessages = messages.map(msg => ({
-    role: msg.role === 'assistant' ? 'model' : 'user',
-    parts: [{ text: msg.content }]
-  }));
+  // Filter and sanitize message history
+  let rawList = messages
+    .filter(m => m && typeof m.content === 'string' && m.content.trim().length > 0)
+    .map(m => ({
+      role: m.role === 'assistant' || m.role === 'model' ? 'model' : 'user',
+      text: m.content.trim()
+    }));
 
-  // Fallback models in case of high demand spikes on any single model
+  // Discard any initial greeting/model messages so turn 0 is ALWAYS 'user'
+  while (rawList.length > 0 && rawList[0].role === 'model') {
+    rawList.shift();
+  }
+
+  // Keep last 10 messages for memory & speed
+  if (rawList.length > 10) {
+    rawList = rawList.slice(-10);
+    // Again ensure starts with 'user'
+    while (rawList.length > 0 && rawList[0].role === 'model') {
+      rawList.shift();
+    }
+  }
+
+  if (rawList.length === 0) {
+    return res.status(200).json({ message: "Hello! Welcome to Noor Layers MFG. How can I assist you with custom apparel or manufacturing today?" });
+  }
+
+  // Build strictly alternating list (user -> model -> user -> model ...)
+  const contents = [];
+  for (const item of rawList) {
+    if (contents.length === 0) {
+      if (item.role === 'user') {
+        contents.push({ role: 'user', parts: [{ text: item.text }] });
+      }
+    } else {
+      const last = contents[contents.length - 1];
+      if (last.role === item.role) {
+        last.parts[0].text += `\n${item.text}`;
+      } else {
+        contents.push({ role: item.role, parts: [{ text: item.text }] });
+      }
+    }
+  }
+
+  // Ensure last message is from user
+  if (contents.length === 0 || contents[contents.length - 1].role !== 'user') {
+    const fallbackText = rawList[rawList.length - 1]?.text || "Hello";
+    contents.push({ role: 'user', parts: [{ text: fallbackText }] });
+  }
+
+  // Multi-model failover list (order of priority)
   const modelsToTry = [
     'gemini-2.5-flash-lite',
     'gemini-flash-latest',
@@ -76,20 +120,17 @@ Tell them our team will prepare their quotation promptly.`;
     'gemini-3.8-flash'
   ];
 
-  let lastError = null;
-
   for (const model of modelsToTry) {
     try {
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY.trim()}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           system_instruction: { parts: [{ text: systemInstruction }] },
-          contents: formattedMessages,
+          contents: contents,
           generationConfig: {
-            temperature: 0.3
+            temperature: 0.3,
+            maxOutputTokens: 600
           }
         })
       });
@@ -101,23 +142,22 @@ Tell them our team will prepare their quotation promptly.`;
         return res.status(200).json({ message: aiMessage });
       }
 
-      // If high demand or temporary error, log and try next model
-      lastError = data?.error?.message || `Model ${model} returned error status ${response.status}`;
-      console.warn(`[Gemini Fallback] Model ${model} failed with: ${lastError}. Trying next model...`);
+      console.warn(`[Gemini Fallback] Model ${model} returned:`, data?.error?.message || response.status);
     } catch (err) {
-      lastError = err.message;
-      console.warn(`[Gemini Fallback] Network error on ${model}: ${err.message}. Trying next model...`);
+      console.warn(`[Gemini Fallback] Network error on ${model}:`, err.message);
     }
   }
 
-  // Graceful fallback response if all Google models are temporarily under heavy load
-  const latestUserMsg = messages[messages.length - 1]?.content?.toLowerCase() || '';
-  let fallbackReply = "Welcome to Noor Layers MFG! We specialize in custom jackets, hoodies, sportswear, and private label manufacturing. To provide an accurate quotation, could you share the product type, estimated quantity, and destination country? You can also reach our team directly via WhatsApp at +92 315 4533297 or email ismailbatti1234@gmail.com.";
+  // Intelligent conversational fallback if Google API is temporarily unreachable
+  const latestQuestion = rawList[rawList.length - 1]?.text?.toLowerCase() || '';
+  let fallbackReply = "We can certainly assist you with that! Noor Layers MFG specializes in custom manufacturing for hoodies, jackets, sportswear, and private labeling. Could you please share your required quantity, design specifications, and delivery country so we can guide your quotation?";
 
-  if (latestUserMsg.includes('price') || latestUserMsg.includes('cost') || latestUserMsg.includes('how much')) {
-    fallbackReply = "At Noor Layers MFG, pricing depends on your required quantity, fabric specifications, custom branding/embroidery, and shipping destination. Please let us know the quantity and specs you need so we can prepare an exact quotation for you!";
-  } else if (latestUserMsg.includes('hoodie') || latestUserMsg.includes('jacket') || latestUserMsg.includes('shirt')) {
-    fallbackReply = "Yes, we specialize in high-quality custom manufacturing for jackets, hoodies, sportswear, and teamwear. Do you have a design or logo ready, and what quantity are you looking to produce?";
+  if (latestQuestion.includes('price') || latestQuestion.includes('cost') || latestQuestion.includes('how much') || latestQuestion.includes('rate')) {
+    fallbackReply = "Our pricing is customized based on your order quantity, fabric selection, branding requirements (embroidery/printing), and delivery destination. If you share your quantity and design details, our team will provide a tailored quotation!";
+  } else if (latestQuestion.includes('ship') || latestQuestion.includes('deliver') || latestQuestion.includes('country') || latestQuestion.includes('uk') || latestQuestion.includes('usa')) {
+    fallbackReply = "Yes, we ship globally including the USA, UK, Europe, Canada, and Australia. Please let us know your required product, quantity, and destination country to provide production and shipping timelines.";
+  } else if (latestQuestion.includes('hoodie') || latestQuestion.includes('jacket') || latestQuestion.includes('shirt')) {
+    fallbackReply = "Yes, we specialize in high-grade custom apparel manufacturing with complete private labeling. Do you already have a design or logo, and how many pieces are you looking to produce?";
   }
 
   return res.status(200).json({ message: fallbackReply });
