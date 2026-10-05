@@ -79,13 +79,13 @@ export default async function handler(req, res) {
       ? specifications.map(s => String(s).trim()).join(', ')
       : 'None selected';
 
-    const recipientEmail = 'ismailbhatti78612@gmail.com';
-    const emailSubject = 'New Client Inquiry - Noor Layers MFG';
+    const recipientEmail = process.env.INQUIRY_RECIPIENT_EMAIL || 'ismailbatti1234@gmail.com';
+    const emailSubject = `New Client Inquiry: ${safeName} (${safeCompany}) - Noor Layers MFG`;
 
-    // Plain text email format as requested
+    // Plain text email format
     const textBody = [
-      `New Client Inquiry - Noor Layers MFG`,
-      `====================================`,
+      `New Client Manufacturing Inquiry - Noor Layers MFG`,
+      `==================================================`,
       `Client Name: ${safeName}`,
       `Company Name: ${safeCompany}`,
       `Client Email: ${safeEmail}`,
@@ -95,10 +95,11 @@ export default async function handler(req, res) {
       `Quantity: ${safeQuantity}`,
       `Selected Specs: ${specsFormatted}`,
       ``,
-      `Client Requirements:`,
+      `Client Requirements / Notes:`,
       `${safeRequirements}`,
       ``,
-      `------------------------------------`,
+      `--------------------------------------------------`,
+      `Direct WhatsApp Link: https://wa.me/${safePhone.replace(/[^0-9]/g, '')}`,
       `Submitted via Noor Layers MFG Portal (${new Date().toUTCString()})`
     ].join('\n');
 
@@ -176,86 +177,120 @@ export default async function handler(req, res) {
       </html>
     `;
 
-    // Strategy 1: Resend (Native HTTPS Fetch, zero dependencies)
-    const resendApiKey = process.env.RESEND_API_KEY;
-    if (resendApiKey) {
-      const resendFrom = process.env.RESEND_FROM || 'Noor Layers MFG <onboarding@resend.dev>';
-      const resendRes = await fetch('https://api.resend.com/emails', {
+    let delivered = false;
+
+    // Strategy 1: FormSubmit (Direct to Gmail, zero configuration required)
+    try {
+      const fsRes = await fetch(`https://formsubmit.co/ajax/${recipientEmail}`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${resendApiKey}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Referer': 'https://website-bulid.vercel.app',
+          'Origin': 'https://website-bulid.vercel.app'
         },
         body: JSON.stringify({
-          from: resendFrom,
-          to: [recipientEmail],
-          reply_to: safeEmail,
-          subject: emailSubject,
-          text: textBody,
-          html: htmlBody
+          name: safeName,
+          company: safeCompany,
+          email: safeEmail,
+          phone: safePhone,
+          country: safeCountry,
+          product: safeProduct,
+          quantity: safeQuantity,
+          specifications: specsFormatted,
+          requirements: safeRequirements,
+          _subject: emailSubject
         })
       });
 
-      if (resendRes.ok) {
-        return res.status(200).json({
-          success: true,
-          message: 'Thank you for your inquiry. We have received your request and will contact you soon.'
-        });
-      } else {
-        const errorDetails = await resendRes.text();
-        console.error('Resend delivery error:', errorDetails);
+      if (fsRes.ok) {
+        delivered = true;
       }
+    } catch (fsErr) {
+      console.warn('FormSubmit delivery error:', fsErr);
     }
 
-    // Strategy 2: Web3Forms / Custom Webhook fallback
-    const webhookUrl = process.env.EMAIL_WEBHOOK_URL || (process.env.WEB3FORMS_KEY ? 'https://api.web3forms.com/submit' : null);
-    if (webhookUrl) {
-      const webhookPayload = process.env.WEB3FORMS_KEY
-        ? {
-            access_key: process.env.WEB3FORMS_KEY,
-            subject: emailSubject,
-            from_name: `${safeName} via Noor Layers MFG`,
-            replyto: safeEmail,
-            name: safeName,
-            email: safeEmail,
-            phone: safePhone,
-            message: textBody
-          }
-        : {
-            to: recipientEmail,
+    // Strategy 2: Resend (Native HTTPS Fetch if key configured)
+    const resendApiKey = process.env.RESEND_API_KEY;
+    if (resendApiKey) {
+      try {
+        const resendFrom = process.env.RESEND_FROM || 'Noor Layers MFG <onboarding@resend.dev>';
+        const resendRes = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${resendApiKey.trim()}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            from: resendFrom,
+            to: [recipientEmail],
+            reply_to: safeEmail,
             subject: emailSubject,
             text: textBody,
             html: htmlBody
-          };
-
-      const hookRes = await fetch(webhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(webhookPayload)
-      });
-
-      if (hookRes.ok) {
-        return res.status(200).json({
-          success: true,
-          message: 'Thank you for your inquiry. We have received your request and will contact you soon.'
+          })
         });
+
+        if (resendRes.ok) {
+          delivered = true;
+        } else {
+          console.warn('Resend response not ok:', await resendRes.text());
+        }
+      } catch (rErr) {
+        console.warn('Resend fetch error:', rErr);
       }
     }
 
-    // Strategy 3: Standard Fallback (Logs inquiry cleanly to Vercel runtime logs)
-    console.log(`[INQUIRY_DELIVERED_TO_${recipientEmail}]:\n${textBody}`);
+    // Strategy 3: Webhook / Web3Forms if configured
+    const webhookUrl = process.env.EMAIL_WEBHOOK_URL || (process.env.WEB3FORMS_KEY ? 'https://api.web3forms.com/submit' : null);
+    if (webhookUrl) {
+      try {
+        const webhookPayload = process.env.WEB3FORMS_KEY
+          ? {
+              access_key: process.env.WEB3FORMS_KEY,
+              subject: emailSubject,
+              from_name: `${safeName} via Noor Layers MFG`,
+              replyto: safeEmail,
+              name: safeName,
+              email: safeEmail,
+              phone: safePhone,
+              message: textBody
+            }
+          : {
+              to: recipientEmail,
+              subject: emailSubject,
+              text: textBody,
+              html: htmlBody
+            };
+
+        const hookRes = await fetch(webhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(webhookPayload)
+        });
+
+        if (hookRes.ok) {
+          delivered = true;
+        }
+      } catch (wErr) {
+        console.warn('Webhook error:', wErr);
+      }
+    }
+
+    // Always log inquiry to Vercel logs so leads are never lost
+    console.log(`[INQUIRY_RECEIVED_FOR_${recipientEmail}]:\n${textBody}`);
 
     return res.status(200).json({
       success: true,
-      message: 'Thank you for your inquiry. We have received your request and will contact you soon.',
-      info: 'Inquiry received and logged.'
+      message: 'Thank you for your inquiry. We have received your request and our export desk will contact you soon.',
+      delivered: delivered
     });
 
   } catch (error) {
     console.error('Error processing inquiry:', error);
     return res.status(500).json({
       success: false,
-      message: 'Unable to process your inquiry at this moment. Please try again or contact us directly via WhatsApp (+92 315 4533297).'
+      message: 'Unable to process your inquiry at this moment. Please reach out directly via WhatsApp (+92 315 4533297).'
     });
   }
 }
